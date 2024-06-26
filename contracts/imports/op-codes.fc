@@ -1,0 +1,13 @@
+;; ---- Donation
+const int op::create_donation = 0x0;
+const int op::donate = 0x1;
+const int op::change_deadline = 0x2;
+const int op::change_destination = 0x3;
+const int op::disable_donation = 0x6;
+const int op::add_admin = 0x7;
+const int op::change_owner = 0x8;
+const int op::remove_admin = 0x9;
+
+;; ---- Nft
+const int op::mint_nft = 0x4;
+const int op::internal_mint_nft = 0x5;

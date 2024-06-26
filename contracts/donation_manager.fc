@@ -1,0 +1,24 @@
+#include "imports/stdlib.fc";
+#include "imports/op-codes.fc";
+
+(slice, cell) load_data() {
+    slice ds = get_data().begin_parse();
+
+    return (
+        ds~load_msg_addr(), ;; owner
+        ds~load_dict() ;; admins
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; TODO create_donation
+    ;; TODO disable_donation
+    ;; TODO enable_donation
+    ;; TODO change owner
+    ;; TODO add/remove admin
+}
+
+;; TODO get_owner
+
+
+;; TODO get_admins
