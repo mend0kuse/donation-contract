@@ -1,24 +1,209 @@
 #include "imports/stdlib.fc";
 #include "imports/op-codes.fc";
+#include "imports/error-codes.fc";
+#include "imports/utils.fc";
+#include "imports/sizes.fc";
 
-(slice, cell) load_data() {
+(slice, int, cell, cell) load_data() {
     slice ds = get_data().begin_parse();
+    
+    slice owner = ds~load_msg_addr();
+    int next_donation_index = ds~load_uint(size::item_index);
+    cell donation_item_code = ds~load_ref();
+    cell admins_dict = ds.slice_bits() > 0 ? ds~load_dict() : new_dict();
 
     return (
-        ds~load_msg_addr(), ;; owner
-        ds~load_dict() ;; admins
+        owner,
+        next_donation_index,
+        donation_item_code,
+        admins_dict
     );
 }
 
-() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
-    ;; TODO create_donation
-    ;; TODO disable_donation
-    ;; TODO enable_donation
-    ;; TODO change owner
-    ;; TODO add/remove admin
+() deploy_donation_item(int item_index, cell donation_item_code, int hardcap, slice destination, int deadline) impure {
+    cell state_init = calculate_donation_item_state_init(item_index, my_address(), donation_item_code);
+    slice donation_address = calculate_donation_item_address(state_init);   
+
+    cell msg = begin_cell()
+              .store_uint(0x18, 6)
+              .store_slice(donation_address)
+              .store_coins(50000000)
+              .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+              .store_ref(state_init)
+              .store_ref(
+                begin_cell()
+                    .store_coins(hardcap) ;; hardcap
+                    .store_slice(destination) ;; destination address
+                    .store_uint(deadline, size::deadline) ;; deadline
+                    .store_uint(1, size::active_flag) ;; is_active
+                .end_cell()
+              )
+              .end_cell();
+              
+
+    send_raw_message(msg, 1); ;; pay transfer fees separately, revert on errors
 }
 
-;; TODO get_owner
+() save_data(slice owner, int next_donation_index, cell admins, cell donation_item_code) impure {
+    set_data(
+        begin_cell()
+            .store_slice(owner)
+            .store_uint(next_donation_index, size::item_index)
+            .store_ref(donation_item_code)
+            .store_dict(admins)
+        .end_cell()
+    );
+}
 
+;; (is_owner, is_admin)
+(int, int) check_manage_rights(slice address) {
+    (slice owner, _, _, cell admins_dict) = load_data();
+    
+    if equal_slices(address, owner) {
+        return (-1, -1); ;; owner is admin by default
+    }
 
-;; TODO get_admins
+    (_, int flag) = admins_dict.dict_get?(size::admins_dict_key, address);
+
+    return (0, flag);
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    
+    int flags = cs~load_int(size::msg_flags);
+    slice sender = cs~load_msg_addr();
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    (int is_owner, int is_admin) = check_manage_rights(sender);
+    throw_if(error::forbidden, ~ is_admin & ~ is_owner); ;; only owner or admin allowed interact with contract
+
+    (int op, int query_id) = (in_msg_body~load_uint(size::msg_op), in_msg_body~load_uint(size::msg_query_id));
+    (slice owner, int next_item_index, cell donation_item_code, cell admins_dict) = load_data();
+    
+    if op == op::change_owner {
+        throw_if(error::forbidden, ~ is_owner);
+        slice new_owner = in_msg_body~load_msg_addr();
+        
+        save_data(new_owner, next_item_index, admins_dict, donation_item_code);
+        return ();
+    }
+
+    if op == op::add_admins {
+        throw_if(error::forbidden, ~ is_owner);
+    
+        tuple new_admins = deserialize_tuple_addresses(in_msg_body~load_ref());
+        int len = new_admins.tlen();
+
+        int i = 0;
+
+        while (i < len) {
+            slice addr = new_admins.at(i);
+            admins_dict~dict_set(size::admins_dict_key, addr, addr);
+
+            i = i + 1;
+        }
+
+        save_data(owner, next_item_index, admins_dict, donation_item_code);
+        return ();
+    }
+
+    if op == op::remove_admin {
+        throw_if(error::forbidden, ~ is_owner);
+
+        tuple new_admins = deserialize_tuple_addresses(in_msg_body~load_ref());
+        int len = new_admins.tlen();
+
+        int i = 0;
+
+        while (i < len) {
+            slice addr = new_admins.at(i);
+            admins_dict~dict_delete?(size::admins_dict_key, addr);
+
+            i = i + 1;
+        }
+
+        save_data(owner, next_item_index, admins_dict, donation_item_code);
+        
+        return ();
+    }
+
+    if op == op::create_donation {
+        deploy_donation_item(next_item_index, donation_item_code, in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_uint(size::deadline));
+        next_item_index += 1;
+        
+        save_data(owner, next_item_index, admins_dict, donation_item_code);
+        return ();
+    }
+
+    if op == op::disable_donation {
+        int item_index = in_msg_body~load_uint(size::item_index);
+        slice donation_address = calculate_donation_item(item_index, my_address(), donation_item_code);    
+
+        var msg = begin_cell()
+              .store_uint(0x18, 6)
+              .store_slice(donation_address)
+              .store_coins(50000000)
+              .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+              .store_uint(op::disable_donation, size::msg_op)
+              .store_uint(1, size::msg_query_id)
+              .end_cell();
+   
+        send_raw_message(msg, 1); ;; pay transfer fees separately, revert on errors
+        return ();
+    }
+
+    if op == op::enable_donation {
+        int item_index = in_msg_body~load_uint(size::item_index);
+        
+        slice donation = calculate_donation_item(item_index, my_address(), donation_item_code);    
+
+        var msg = begin_cell()
+              .store_uint(0x18, 6)
+              .store_slice(donation)
+              .store_coins(0)
+              .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+              .store_uint(op::enable_donation, size::msg_op)
+              .store_uint(1, size::msg_query_id)
+              .end_cell();
+              
+        send_raw_message(msg, 1); ;; pay transfer fees separately, revert on errors
+
+        return ();
+    }
+
+    throw(error::unknown_op);
+}
+
+slice get_owner() method_id {
+    (slice owner, _, _, _) = load_data();
+    
+    return owner;
+}
+
+cell get_admins() method_id {
+    (_, _, _, cell admins_dict) = load_data();
+
+    return admins_dict;
+}
+
+(int, int) get_manage_rights(slice address) method_id {
+    (int is_owner, int is_admin) = check_manage_rights(address);
+    
+    return (
+        is_owner,
+        is_admin
+    );
+}
+
+slice get_donation_address_by_index(int index) method_id {
+     (_, _, cell donation_item_code, _) = load_data();
+    return calculate_donation_item(index, my_address(), donation_item_code);   
+}

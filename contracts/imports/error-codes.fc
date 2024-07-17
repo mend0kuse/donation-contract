@@ -1,0 +1,5 @@
+const int error::unknown_op = 0xffff;
+const int error::forbidden = 0x1111;
+const int error::disabled_donation = 0x2222;
+const int error::useless_operation = 0x3333; ;; message changing nothing
+const int error::passed_hardcap = 0x4444;

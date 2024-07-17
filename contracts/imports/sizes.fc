@@ -1,0 +1,10 @@
+;; size in bytes
+
+const int size::admins_dict_key = 267;
+const int size::donators_dict_key = 267;
+const int size::item_index = 64;
+const int size::deadline = 32;
+const int size::msg_flags = 4;
+const int size::msg_op = 32;
+const int size::msg_query_id = 64;
+const int size::active_flag = 1;

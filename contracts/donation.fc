@@ -1,24 +1,134 @@
 #include "imports/stdlib.fc";
+#include "imports/op-codes.fc";
+#include "imports/error-codes.fc";
+#include "imports/utils.fc";
+#include "imports/sizes.fc";
 
-(int, slice, cell, int) load_data() {
+(int, int, slice, int, int, slice, int) load_data() {
     slice ds = get_data().begin_parse();
 
-    return (
-        ds~load_coins(), ;; hardcap
-        ds~load_msg_addr(), ;; destination address
-        ds~load_dict(), ;; donators
-        ds~load_uint(32), ;; deadline
-        ds~load_uint(2) ;; isActive
+    int index = ds~load_uint(size::item_index); 
+    slice manager_addr = ds~load_msg_addr(); 
+
+    if (ds.slice_bits() > 0) {
+        return (
+            -1, ;; inited
+            index,
+            manager_addr,
+            ds~load_uint(size::active_flag), ;; is_active
+            ds~load_coins(), ;; hardcap
+            ds~load_msg_addr(), ;; destination address
+            ds~load_uint(size::deadline) ;; deadline
+        );
+    } else {
+        return (
+            0,
+            index,
+            manager_addr,
+            null(),
+            null(), 
+            null(), 
+            null()
+        );
+    }
+
+}
+
+() save_data(int index, slice manager, int hardcap, slice destination, int deadline, int is_active) impure {
+    set_data(
+        begin_cell()
+            .store_uint(index, size::item_index)
+            .store_slice(manager)
+            .store_uint(is_active, size::active_flag)
+            .store_coins(hardcap)
+            .store_slice(destination)
+            .store_uint(deadline, size::deadline)
+        .end_cell()
     );
 }
 
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
-    ;; receive donation
-    ;; disabled if inactive
-    ;; change destination address
-    ;; change deadline/hardcap
-    ;; move all funds to destination when hardcap is passed
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_int(size::msg_flags);
+    slice sender = cs~load_msg_addr();
+
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    (int inited?, int index, slice manager, int is_active, int hardcap, slice destination, int deadline) = load_data();
+    int is_manager_sender = equal_slices(sender, manager);
+
+    if (~ inited?) {
+        throw_unless(error::forbidden, is_manager_sender);
+
+        save_data(
+            index, 
+            manager, 
+            in_msg_body~load_coins(), 
+            in_msg_body~load_msg_addr(), 
+            in_msg_body~load_uint(size::deadline), 
+            in_msg_body~load_uint(size::active_flag)
+        );
+        
+        return ();
+    }
+
+    int op = in_msg_body~load_uint(size::msg_op);
+    int query_id = in_msg_body~load_uint(size::msg_query_id);
+
+    int is_owner_sender = equal_slices(destination, sender);
+    int has_passed_hardcap = my_balance >= hardcap;
+
+    if op == op::disable_donation {
+        throw_if(error::forbidden, ~ is_manager_sender);
+        save_data(index, manager, hardcap, destination, deadline, 0);
+        return ();
+    }
+
+    if op == op::enable_donation {
+        throw_if(error::forbidden, ~ is_manager_sender);
+        throw_if(error::useless_operation, is_active);
+
+        save_data(index, manager, hardcap, destination, deadline, 1);
+        return ();
+    }
+
+    throw_if(error::disabled_donation, is_active == 0);
+
+    if op == op::change_settings {
+        throw_if(error::forbidden, ~ is_owner_sender);
+
+        (slice new_destination, int new_hardcap, int new_deadline) = (in_msg_body~load_msg_addr(), in_msg_body~load_coins(), in_msg_body~load_uint(size::deadline));
+
+        save_data(index, manager, new_hardcap, new_destination, new_deadline, is_active);
+        return ();
+    }
+
+    throw(error::unknown_op);
 }
 
-;; TODO get_balance
-;; TODO get_info (hardcap, deadline, donators, status, destination)
+int get_donation_balance() method_id {
+    [int balance, _] = get_balance();
+    return balance;
+}
+
+(int, int, int, slice, int, int, slice, int) get_donation_data() method_id {
+    [int balance, _] = get_balance();
+    (int inited?, int index, slice manager, int is_active, int hardcap, slice destination, int deadline) = load_data();
+
+    return (
+        inited?,
+        index,
+        balance,
+        manager,
+        hardcap,
+        is_active,
+        destination,
+        deadline
+    );
+}

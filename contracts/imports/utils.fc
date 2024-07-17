@@ -1,0 +1,49 @@
+#include "./sizes.fc";
+#include "./stdlib.fc";
+
+cell calculate_donation_item_state_init(int item_index, slice manager_address, cell donation_item_code) inline {
+  cell data = begin_cell().store_uint(item_index, size::item_index).store_slice(manager_address).end_cell();
+
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(donation_item_code)
+          .store_dict(data)
+          .store_uint(0, 1)
+         .end_cell();
+}
+
+slice calculate_donation_item_address(cell state_init) inline {
+  return begin_cell()
+      .store_uint(4, 3)
+      .store_int(0, 8)
+      .store_uint(cell_hash(state_init), 256)
+      .end_cell()
+      .begin_parse();
+}
+
+slice calculate_donation_item(int index, slice manager_address, cell donation_item_code) {
+   return calculate_donation_item_address(calculate_donation_item_state_init(index, manager_address, donation_item_code));
+}
+
+
+tuple deserialize_tuple_addresses(cell serializedCell) {
+  tuple result = empty_tuple();
+  slice s = serializedCell.begin_parse();
+
+  int length = s~load_int(24);
+
+  repeat length {
+    cell tail = s~load_ref();
+
+    s~skip_bits(34);
+    cell tmp = s~load_ref();
+    var cell_with_addr = tmp.begin_parse();
+            
+    slice addr = cell_with_addr~load_msg_addr();
+    result~tpush(addr);
+
+    s = tail.begin_parse();
+  }
+
+  return result;
+}

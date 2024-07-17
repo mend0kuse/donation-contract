@@ -1,0 +1,11 @@
+ Tests
+ ---
+ 1. Enums with op/sizes
+
+
+Contracts
+ ---
+ 1. Validate payloads
+ 2. Work on decrease fees
+ 3. Handle bounces
+ 4. TL-B
