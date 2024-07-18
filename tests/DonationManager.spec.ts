@@ -61,7 +61,7 @@ describe('DonationManager', () => {
 
     describe('owner flow', () => {
         it('deployer must be owner', async () => {
-            expect(await donationManagerContract.getOwner()).toEqualAddress(deployer.address);
+            expect((await donationManagerContract.getData()).owner).toEqualAddress(deployer.address);
         });
 
         it('should change owner', async () => {
@@ -73,7 +73,7 @@ describe('DonationManager', () => {
                 body: beginCell().storeUint(0x8, 32).storeUint(1n, 64).storeAddress(newOwner.address).endCell(),
             });
 
-            expect(await donationManagerContract.getOwner()).toEqualAddress(newOwner.address);
+            expect((await donationManagerContract.getData()).owner).toEqualAddress(newOwner.address);
         });
 
         it('should forbid to change owner', async () => {
@@ -85,7 +85,7 @@ describe('DonationManager', () => {
                 body: beginCell().storeUint(0x8, 32).storeUint(1n, 64).storeAddress(newOwner.address).endCell(),
             });
 
-            const realOwner = await donationManagerContract.getOwner();
+            const realOwner = (await donationManagerContract.getData()).owner;
 
             expect(realOwner).not.toEqualAddress(newOwner.address);
             expect(realOwner).toEqualAddress(deployer.address);
@@ -106,7 +106,7 @@ describe('DonationManager', () => {
                 serializeTuple(tuple_builder.build()),
             );
 
-            const admins = await donationManagerContract.getAdmins();
+            const admins = (await donationManagerContract.getData()).admins;
 
             expect(admins.get(newAdmin.address)).toBeDefined();
             expect(admins.get(newAdmin2.address)).toBeDefined();
@@ -123,7 +123,7 @@ describe('DonationManager', () => {
                 serializeTuple(tuple_builder.build()),
             );
 
-            const admins = await donationManagerContract.getAdmins();
+            const admins = (await donationManagerContract.getData()).admins;
 
             expect(admins.get(newAdmin.address)).toBeUndefined();
         });
@@ -148,7 +148,7 @@ describe('DonationManager', () => {
                 serializeTuple(tuple_builder_remove.build()),
             );
 
-            const admins = await donationManagerContract.getAdmins();
+            const admins = (await donationManagerContract.getData()).admins;
 
             expect(admins.get(newAdmin.address)).toBeDefined();
             expect(admins.get(newAdmin2.address)).toBeUndefined();
@@ -173,7 +173,7 @@ describe('DonationManager', () => {
                 serializeTuple(tuple_builder_remove.build()),
             );
 
-            const admins = await donationManagerContract.getAdmins();
+            const admins = (await donationManagerContract.getData()).admins;
             expect(admins.get(newAdmin2.address)).toBeDefined();
         });
     });

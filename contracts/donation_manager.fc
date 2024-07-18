@@ -182,17 +182,12 @@
     throw(error::unknown_op);
 }
 
-slice get_owner() method_id {
-    (slice owner, _, _, _) = load_data();
-    
-    return owner;
+(slice, int, cell) get_contract_data() method_id {
+    (slice owner, int index, _, cell admins_dict) = load_data();
+
+    return (owner, index, admins_dict);
 }
 
-cell get_admins() method_id {
-    (_, _, _, cell admins_dict) = load_data();
-
-    return admins_dict;
-}
 
 (int, int) get_manage_rights(slice address) method_id {
     (int is_owner, int is_admin) = check_manage_rights(address);

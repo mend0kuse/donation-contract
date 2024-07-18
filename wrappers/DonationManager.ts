@@ -60,10 +60,23 @@ export class DonationManager implements Contract {
         });
     }
 
-    async getOwner(provider: ContractProvider) {
-        const result = (await provider.get('get_owner', [])).stack;
+    async getData(provider: ContractProvider) {
+        const result = (await provider.get('get_contract_data', [])).stack;
 
-        return result.readAddress();
+        return {
+            owner: result.readAddress(),
+            index: result.readBigNumber(),
+            admins: (() => {
+                try {
+                    return result
+                        .readCell()
+                        .beginParse()
+                        .loadDictDirect(Dictionary.Keys.Address(), Dictionary.Values.Address());
+                } catch (error) {
+                    return Dictionary.empty(Dictionary.Keys.Address(), Dictionary.Values.Address());
+                }
+            })(),
+        };
     }
 
     async getManagerRights(provider: ContractProvider, target: Address) {
@@ -74,19 +87,6 @@ export class DonationManager implements Contract {
         ).stack;
 
         return [!!result.readBigNumber(), !!result.readBigNumber()];
-    }
-
-    async getAdmins(provider: ContractProvider) {
-        const result = (await provider.get('get_admins', [])).stack;
-
-        try {
-            return result
-                .readCell()
-                .beginParse()
-                .loadDictDirect(Dictionary.Keys.Address(), Dictionary.Values.Address());
-        } catch (error) {
-            return Dictionary.empty();
-        }
     }
 
     async getDonationByIndex(provider: ContractProvider, index: bigint) {
