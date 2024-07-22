@@ -151,7 +151,7 @@
               .store_uint(0x18, 6)
               .store_slice(donation_address)
               .store_coins(50000000)
-              .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+              .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
               .store_uint(op::disable_donation, size::msg_op)
               .store_uint(1, size::msg_query_id)
               .end_cell();
@@ -162,14 +162,13 @@
 
     if op == op::enable_donation {
         int item_index = in_msg_body~load_uint(size::item_index);
-        
-        slice donation = calculate_donation_item(item_index, my_address(), donation_item_code);    
+        slice donation_address = calculate_donation_item(item_index, my_address(), donation_item_code);    
 
         var msg = begin_cell()
               .store_uint(0x18, 6)
-              .store_slice(donation)
-              .store_coins(0)
-              .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+              .store_slice(donation_address)
+              .store_coins(50000000)
+              .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
               .store_uint(op::enable_donation, size::msg_op)
               .store_uint(1, size::msg_query_id)
               .end_cell();
