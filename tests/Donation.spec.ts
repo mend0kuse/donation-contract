@@ -166,6 +166,32 @@ describe('Donation', () => {
             const { balance: contractBalance2 } = await donationContract.getData();
             expect(contractBalance2).toBeGreaterThanOrEqual(donationAmount);
         });
+
+        it('should handle passed hardcap', async () => {
+            const donationAmount = toNano('105');
+            const result = await donationContract.sendDonation(donator1.getSender(), donationAmount);
+
+            expect(result.transactions).toHaveTransaction({
+                from: donationContract.address,
+                to: donationAuthor.address,
+                success: true,
+                value: (x) => {
+                    if (!x) {
+                        return false;
+                    }
+
+                    return x >= donationAmount;
+                },
+            });
+
+            expect(donationContract.getData()).rejects.toThrow({
+                message: 'Trying to run get method on non-active contract',
+                name: '',
+            });
+
+            const authorBalance = await donationAuthor.getBalance();
+            expect(authorBalance).toBeGreaterThanOrEqual(donationAmount);
+        });
     });
 
     it('should handle unknown op', async () => {

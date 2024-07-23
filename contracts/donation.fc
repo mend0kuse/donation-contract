@@ -127,7 +127,7 @@
                     .store_coins(0)
                     .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
 
-            send_raw_message(msg.end_cell(), 128 + 16);
+            send_raw_message(msg.end_cell(), 128 + 16 + 32);
         }
 
         return ();

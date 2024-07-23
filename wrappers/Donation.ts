@@ -96,6 +96,7 @@ export class Donation implements Contract {
         await provider.internal(sender, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().storeUint(0x1, 32).storeUint(1n, 64).endCell(),
         });
     }
 
