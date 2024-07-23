@@ -76,19 +76,19 @@ export class Donation implements Contract {
         };
     }
 
-    async sendDisableDonation(provider: ContractProvider, sender: Sender, value: bigint) {
+    async sendDisableDonation(provider: ContractProvider, sender: Sender, value: bigint, excess_receiver: Address) {
         await provider.internal(sender, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
-            body: beginCell().storeUint(0x6, 32).storeUint(1n, 64).endCell(),
+            body: beginCell().storeUint(0x6, 32).storeUint(1n, 64).storeAddress(excess_receiver).endCell(),
         });
     }
 
-    async sendEnableDonation(provider: ContractProvider, sender: Sender, value: bigint) {
+    async sendEnableDonation(provider: ContractProvider, sender: Sender, value: bigint, excess_receiver: Address) {
         await provider.internal(sender, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
-            body: beginCell().storeUint(0x10, 32).storeUint(1n, 64).endCell(),
+            body: beginCell().storeUint(0x10, 32).storeUint(1n, 64).storeAddress(excess_receiver).endCell(),
         });
     }
 

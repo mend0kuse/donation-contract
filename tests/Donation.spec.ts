@@ -71,6 +71,7 @@ describe('Donation', () => {
         const result = await donationContract.sendDisableDonation(
             blockchain.sender(donationManagerContract.address),
             toNano('0.05'),
+            donationManagerContract.address,
         );
 
         expect(result.transactions).toHaveTransaction({
@@ -85,13 +86,36 @@ describe('Donation', () => {
     });
 
     it('should enabling', async () => {
-        await donationContract.sendDisableDonation(blockchain.sender(donationManagerContract.address), toNano('0.05'));
+        await donationContract.sendDisableDonation(
+            blockchain.sender(donationManagerContract.address),
+            toNano('0.05'),
+            donationManagerContract.address,
+        );
         const { isActive: isActiveSecond } = await donationContract.getData();
         expect(isActiveSecond).toBeFalsy();
 
-        await donationContract.sendEnableDonation(blockchain.sender(donationManagerContract.address), toNano('0.05'));
+        await donationContract.sendEnableDonation(
+            blockchain.sender(donationManagerContract.address),
+            toNano('0.05'),
+            donationManagerContract.address,
+        );
         const { isActive: isActiveThird } = await donationContract.getData();
         expect(isActiveThird).toBeTruthy();
+    });
+
+    it('should send excess', async () => {
+        const result = await donationContract.sendDisableDonation(
+            blockchain.sender(donationManagerContract.address),
+            toNano('0.05'),
+            donationAuthor.address,
+        );
+
+        expect(result.transactions).toHaveTransaction({
+            from: donationContract.address,
+            to: donationAuthor.address,
+            success: true,
+            aborted: false,
+        });
     });
 
     it('change data', async () => {

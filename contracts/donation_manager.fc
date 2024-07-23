@@ -154,9 +154,10 @@
               .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
               .store_uint(op::disable_donation, size::msg_op)
               .store_uint(1, size::msg_query_id)
+              .store_slice(sender)
               .end_cell();
    
-        send_raw_message(msg, 1); ;; pay transfer fees separately, revert on errors
+        send_raw_message(msg, 64 + 1); ;; pay transfer fees separately, revert on errors
         return ();
     }
 
@@ -171,9 +172,10 @@
               .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
               .store_uint(op::enable_donation, size::msg_op)
               .store_uint(1, size::msg_query_id)
+              .store_slice(sender)
               .end_cell();
               
-        send_raw_message(msg, 1); ;; pay transfer fees separately, revert on errors
+        send_raw_message(msg, 64 + 1); ;; pay transfer fees separately, revert on errors
 
         return ();
     }
